@@ -777,7 +777,7 @@ if __name__ == '__main__':
     parser.add_argument('--pre_perturb_span_length', type=int, default=5)
     parser.add_argument('--random_fills', action='store_true')
     parser.add_argument('--random_fills_tokens', action='store_true')
-    parser.add_argument('--cache_dir', type=str, default="~/.cache")
+    parser.add_argument('--cache_dir', type=str, default="/storage/work/lxr5326/detect-gpt/.cache")
     args = parser.parse_args()
 
     API_TOKEN_COUNTER = 0
@@ -931,7 +931,7 @@ if __name__ == '__main__':
     save_llr_histograms(outputs)
 
     # move results folder from tmp_results/ to results/, making sure necessary directories exist
-    new_folder = SAVE_FOLDER.replace("tmp_results", "results")
+    new_folder = SAVE_FOLDER.replace("tmp_results", "results") #replace with results2, 3, etc when making changes
     if not os.path.exists(os.path.dirname(new_folder)):
         os.makedirs(os.path.dirname(new_folder))
     os.rename(SAVE_FOLDER, new_folder)
