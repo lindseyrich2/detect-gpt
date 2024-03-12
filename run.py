@@ -744,7 +744,7 @@ def eval_supervised(data, model):
 
 if __name__ == '__main__':
     DEVICE = "cuda"
-
+    start = time.time() #Start Full Timer
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default="xsum")
     parser.add_argument('--dataset_key', type=str, default="document")
@@ -935,5 +935,5 @@ if __name__ == '__main__':
     if not os.path.exists(os.path.dirname(new_folder)):
         os.makedirs(os.path.dirname(new_folder))
     os.rename(SAVE_FOLDER, new_folder)
-
+    print(f'DONE ({time.time() - start:.2f}s)') #Track total Time
     print(f"Used an *estimated* {API_TOKEN_COUNTER} API tokens (may be inaccurate)")
