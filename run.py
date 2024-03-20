@@ -87,6 +87,7 @@ def count_masks(texts):
 
 # replace each masked span with a sample from T5 mask_model
 def replace_masks(texts):
+    #old function 
     n_expected = count_masks(texts)
     stop_id = mask_tokenizer.encode(f"<extra_id_{max(n_expected)}>")[0]
     tokens = mask_tokenizer(texts, return_tensors="pt", padding=True).to(DEVICE)
@@ -127,6 +128,7 @@ def apply_extracted_fills(masked_texts, extracted_fills):
 
 
 def perturb_texts_(texts, span_length, pct, ceil_pct=False):
+    # old function
     if not args.random_fills:
         masked_texts = [tokenize_and_mask(x, span_length, pct, ceil_pct) for x in texts]
         raw_fills = replace_masks(masked_texts)

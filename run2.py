@@ -87,11 +87,30 @@ def count_masks(texts):
 
 # replace each masked span with a sample from T5 mask_model
 def replace_masks(texts):
-    n_expected = count_masks(texts)
-    stop_id = mask_tokenizer.encode(f"<extra_id_{max(n_expected)}>")[0]
-    tokens = mask_tokenizer(texts, return_tensors="pt", padding=True).to(DEVICE)
-    outputs = mask_model.generate(**tokens, max_length=150, do_sample=True, top_p=args.mask_top_p, num_return_sequences=1, eos_token_id=stop_id)
-    return mask_tokenizer.batch_decode(outputs, skip_special_tokens=False)
+    #new function 
+    batch_size=32
+    all_decoded = []
+    for i in range(0, len(texts), batch_size): # using batch proccessing 
+        batch_texts = texts[i:i+batch_size]
+        
+        # calculating expected masks and stop ID 
+        n_expected = count_masks(batch_texts)
+        stop_id = mask_tokenizer.encode(f"<extra_id_{max(n_expected)}>")[0]
+        
+        tokens = mask_tokenizer(batch_texts, return_tensors="pt", padding=True).to(DEVICE)
+        outputs = mask_model.generate(
+            **tokens,
+            max_length=150, 
+            do_sample=True,
+            top_p=args.mask_top_p,
+            num_return_sequences=1,
+            eos_token_id=stop_id
+        )
+        
+        decoded = mask_tokenizer.batch_decode(outputs, skip_special_tokens=False)
+        all_decoded.extend(decoded)
+        
+    return all_decoded
 
 
 def extract_fills(texts):
@@ -127,53 +146,29 @@ def apply_extracted_fills(masked_texts, extracted_fills):
 
 
 def perturb_texts_(texts, span_length, pct, ceil_pct=False):
-    if not args.random_fills:
-        masked_texts = [tokenize_and_mask(x, span_length, pct, ceil_pct) for x in texts]
-        raw_fills = replace_masks(masked_texts)
-        extracted_fills = extract_fills(raw_fills)
-        perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
+    # new function 
+    masked_texts = [tokenize_and_mask(x, span_length, pct, ceil_pct) for x in texts]
+    raw_fills = replace_masks(masked_texts)
+    extracted_fills = extract_fills(raw_fills)
+    perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
+    max_attempts = 5
+    # more efficent logic 
+    attempts = 0
+    while '' in perturbed_texts and attempts < max_attempts:
+        print(f'WARNING: Retrying fills for empty outputs. Attempt {attempts + 1}.')
+        retry_indices = [i for i, text in enumerate(perturbed_texts) if text == '']
+        retry_masked_texts = [masked_texts[i] for i in retry_indices]
+        retry_raw_fills = replace_masks(retry_masked_texts)
+        retry_extracted_fills = extract_fills(retry_raw_fills)
+        retry_filled_texts = apply_extracted_fills(retry_masked_texts, retry_extracted_fills)
 
-        # Handle the fact that sometimes the model doesn't generate the right number of fills and we have to try again
-        attempts = 1
-        while '' in perturbed_texts:
-            idxs = [idx for idx, x in enumerate(perturbed_texts) if x == '']
-            print(f'WARNING: {len(idxs)} texts have no fills. Trying again [attempt {attempts}].')
-            masked_texts = [tokenize_and_mask(x, span_length, pct, ceil_pct) for idx, x in enumerate(texts) if idx in idxs]
-            raw_fills = replace_masks(masked_texts)
-            extracted_fills = extract_fills(raw_fills)
-            new_perturbed_texts = apply_extracted_fills(masked_texts, extracted_fills)
-            for idx, x in zip(idxs, new_perturbed_texts):
-                perturbed_texts[idx] = x
-            attempts += 1
-    else:
-        if args.random_fills_tokens:
-            # tokenize base_tokenizer
-            tokens = base_tokenizer(texts, return_tensors="pt", padding=True).to(DEVICE)
-            valid_tokens = tokens.input_ids != base_tokenizer.pad_token_id
-            replace_pct = args.pct_words_masked * (args.span_length / (args.span_length + 2 * args.buffer_size))
+        for i, text in zip(retry_indices, retry_filled_texts):
+            perturbed_texts[i] = text
 
-            # replace replace_pct of input_ids with random tokens
-            random_mask = torch.rand(tokens.input_ids.shape, device=DEVICE) < replace_pct
-            random_mask &= valid_tokens
-            random_tokens = torch.randint(0, base_tokenizer.vocab_size, (random_mask.sum(),), device=DEVICE)
-            # while any of the random tokens are special tokens, replace them with random non-special tokens
-            while any(base_tokenizer.decode(x) in base_tokenizer.all_special_tokens for x in random_tokens):
-                random_tokens = torch.randint(0, base_tokenizer.vocab_size, (random_mask.sum(),), device=DEVICE)
-            tokens.input_ids[random_mask] = random_tokens
-            perturbed_texts = base_tokenizer.batch_decode(tokens.input_ids, skip_special_tokens=True)
-        else:
-            masked_texts = [tokenize_and_mask(x, span_length, pct, ceil_pct) for x in texts]
-            perturbed_texts = masked_texts
-            # replace each <extra_id_*> with args.span_length random words from FILL_DICTIONARY
-            for idx, text in enumerate(perturbed_texts):
-                filled_text = text
-                for fill_idx in range(count_masks([text])[0]):
-                    fill = random.sample(FILL_DICTIONARY, span_length)
-                    filled_text = filled_text.replace(f"<extra_id_{fill_idx}>", " ".join(fill))
-                assert count_masks([filled_text])[0] == 0, "Failed to replace all masks"
-                perturbed_texts[idx] = filled_text
+        attempts += 1
 
     return perturbed_texts
+
 
 
 def perturb_texts(texts, span_length, pct, ceil_pct=False):
