@@ -19,6 +19,7 @@ import time
 
 
 
+
 # 15 colorblind-friendly colors
 COLORS = ["#0072B2", "#009E73", "#D55E00", "#CC79A7", "#F0E442",
             "#56B4E9", "#E69F00", "#000000", "#0072B2", "#009E73",
@@ -258,6 +259,7 @@ def get_likelihood(logits, labels):
 
 
 # Get the log likelihood of each text under the base_model
+@functools.lru_cache(maxsize=128)
 def get_ll(text):
     if args.openai_model:        
         kwargs = { "engine": args.openai_model, "temperature": 0, "max_tokens": 0, "echo": True, "logprobs": 0}
