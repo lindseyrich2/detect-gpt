@@ -86,13 +86,15 @@ def count_masks(texts):
     return [len([x for x in text.split() if x.startswith("<extra_id_")]) for text in texts]
 
 
+
 # replace each masked span with a sample from T5 mask_model
 def replace_masks(texts):
     #new function 
     batch_size=32
+  
     all_decoded = []
     for i in range(0, len(texts), batch_size): # using batch proccessing 
-        batch_texts = texts[i:i+batch_size]
+        batch_texts = texts[i:i+batch_size] 
         
         # calculating expected masks and stop ID 
         n_expected = count_masks(batch_texts)
@@ -148,6 +150,7 @@ def apply_extracted_fills(masked_texts, extracted_fills):
 
 def perturb_texts_(texts, span_length, pct, ceil_pct=False):
     # new function 
+    #updates for masking function
     masked_texts = [tokenize_and_mask(x, span_length, pct, ceil_pct) for x in texts]
     raw_fills = replace_masks(masked_texts)
     extracted_fills = extract_fills(raw_fills)
@@ -181,6 +184,15 @@ def perturb_texts(texts, span_length, pct, ceil_pct=False):
     for i in tqdm.tqdm(range(0, len(texts), chunk_size), desc="Applying perturbations"):
         outputs.extend(perturb_texts_(texts[i:i + chunk_size], span_length, pct, ceil_pct=ceil_pct))
     return outputs
+
+# def perturb_texts(texts, span_length, pct, ceil_pct=False):
+#     chunk_size = args.chunk_size
+#     if '11b' in mask_filling_model_name:
+#         chunk_size //= 2
+
+#     outputs = [perturbed_text for i in range(0, len(texts), chunk_size) 
+#                for perturbed_text in perturb_texts_(texts[i:i + chunk_size], span_length, pct, ceil_pct=ceil_pct)]
+#     return outputs
 
 
 def drop_last_word(text):
@@ -259,7 +271,7 @@ def get_likelihood(logits, labels):
 
 
 # Get the log likelihood of each text under the base_model
-@functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=None)
 def get_ll(text):
     if args.openai_model:        
         kwargs = { "engine": args.openai_model, "temperature": 0, "max_tokens": 0, "echo": True, "logprobs": 0}
